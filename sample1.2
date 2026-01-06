@@ -1,0 +1,825 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# 🎯 Executive Dashboard - Application Portfolio Health\n\n**Purpose**: Instant visibility into the health status of all applications across your organization. Each application may use different AWS services (Lambda, ECS, RDS, API Gateway, ALB, DynamoDB, S3).\n\n**Health Status**: 🟢 Green = All services healthy | 🟡 Amber = 1+ services degraded | 🔴 Red = Critical failure\n\n**Click any application** to drill down into component-level metrics and logs.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "Dashboard Overview",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "Application health aggregated from all underlying AWS services (Lambda, ECS, RDS, API Gateway, ALB, DynamoDB, S3). Click to drill down.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "null",
+                "result": {
+                  "color": "dark-gray",
+                  "index": 3,
+                  "text": "NO DATA"
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "green",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "View Application Details →",
+              "url": "/d/app-deep-dive?var-application=${__field.labels.application}&from=${__from}&to=${__to}"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "text": {
+          "titleSize": 16,
+          "valueSize": 18
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT AVG(Invocations) FROM SCHEMA(\"AWS/Lambda\", FunctionName) WHERE FunctionName LIKE 'api-service%' GROUP BY FunctionName",
+          "id": "api_service_lambda",
+          "label": "${PROP('Dim.FunctionName')}",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "Invocations",
+          "metricQueryType": 1,
+          "namespace": "AWS/Lambda",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "API_Service_Lambda",
+          "region": "default",
+          "sqlExpression": "",
+          "statistic": "Sum"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT AVG(CPUUtilization) FROM SCHEMA(\"AWS/RDS\", DBInstanceIdentifier) WHERE DBInstanceIdentifier LIKE 'order-mgmt%'",
+          "hide": false,
+          "id": "order_rds",
+          "label": "Order Management",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "CPUUtilization",
+          "metricQueryType": 1,
+          "namespace": "AWS/RDS",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "Order_Management_RDS",
+          "region": "default",
+          "statistic": "Average"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT SUM(TargetResponseTime) FROM SCHEMA(\"AWS/ApplicationELB\", LoadBalancer) WHERE LoadBalancer LIKE '%user-prov%'",
+          "hide": false,
+          "id": "user_alb",
+          "label": "User Provisioning",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "TargetResponseTime",
+          "metricQueryType": 1,
+          "namespace": "AWS/ApplicationELB",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "User_Provisioning_ALB",
+          "region": "default",
+          "statistic": "Average"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT AVG(CPUUtilization) FROM SCHEMA(\"AWS/ECS\", ServiceName, ClusterName) WHERE ServiceName LIKE 'payment%'",
+          "hide": false,
+          "id": "payment_ecs",
+          "label": "Payment Gateway",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "CPUUtilization",
+          "metricQueryType": 1,
+          "namespace": "AWS/ECS",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "Payment_Gateway_ECS",
+          "region": "default",
+          "statistic": "Average"
+        },
+        {
+          "datasource": {
+            "type": "grafana-splunk-datasource",
+            "uid": "Splunk-UID"
+          },
+          "hide": false,
+          "query": "index=main sourcetype=app_logs \n| rex field=_raw \"app=(?<app_name>\\w+)\" \n| stats count(eval(level=\"ERROR\")) as errors, count as total by app_name \n| eval health_score=100-((errors/total)*100) \n| eval health_score=if(isnull(health_score) OR health_score<0, 0, health_score) \n| table app_name health_score",
+          "queryType": "search",
+          "refId": "Splunk_All_Apps"
+        },
+        {
+          "datasource": {
+            "type": "grafana-dynatrace-datasource",
+            "uid": "Dynatrace-UID"
+          },
+          "entitySelector": "type(SERVICE)",
+          "hide": false,
+          "metricSelector": "builtin:service.response.time:avg",
+          "refId": "Dynatrace_Services"
+        }
+      ],
+      "title": "Application Portfolio Health (Click to Drill Down)",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns",
+            "valueLabel": "application"
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "application": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Value": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "Value (mean)": "Health Score",
+              "application": "Application"
+            }
+          }
+        }
+      ],
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "Total number of applications monitored across all platforms (AWS, Splunk, Dynatrace)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 19
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {
+          "titleSize": 16,
+          "valueSize": 48
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT COUNT(DISTINCT FunctionName) FROM SCHEMA(\"AWS/Lambda\", FunctionName)",
+          "id": "lambda_count",
+          "label": "Lambda Apps",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "",
+          "metricQueryType": 1,
+          "namespace": "",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "Lambda_Count",
+          "region": "default",
+          "statistic": "Sum"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT COUNT(DISTINCT ServiceName) FROM SCHEMA(\"AWS/ECS\", ServiceName, ClusterName)",
+          "hide": false,
+          "id": "ecs_count",
+          "label": "ECS Apps",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "",
+          "metricQueryType": 1,
+          "namespace": "",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "ECS_Count",
+          "region": "default",
+          "statistic": "Sum"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT COUNT(DISTINCT DBInstanceIdentifier) FROM SCHEMA(\"AWS/RDS\", DBInstanceIdentifier)",
+          "hide": false,
+          "id": "rds_count",
+          "label": "RDS Apps",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "",
+          "metricQueryType": 1,
+          "namespace": "",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "RDS_Count",
+          "region": "default",
+          "statistic": "Sum"
+        },
+        {
+          "datasource": {
+            "type": "grafana-splunk-datasource",
+            "uid": "Splunk-UID"
+          },
+          "hide": false,
+          "query": "index=main | stats dc(app) as app_count",
+          "queryType": "search",
+          "refId": "Splunk_Count"
+        }
+      ],
+      "title": "Total Applications Monitored",
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "includeTimeField": false,
+            "mode": "seriesToRows",
+            "reducers": [
+              "lastNotNull"
+            ]
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Total",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "Value"
+              ],
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "Applications with health score >= 90% (Green)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 19
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {
+          "titleSize": 16,
+          "valueSize": 48
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT AVG(m1) FROM (SELECT (Invocations - Errors) / Invocations * 100 AS m1 FROM SCHEMA(\"AWS/Lambda\", FunctionName))",
+          "id": "healthy_lambda",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "",
+          "metricQueryType": 1,
+          "namespace": "",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "Healthy_Lambda",
+          "region": "default",
+          "statistic": "Average"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT AVG(100 - CPUUtilization) FROM SCHEMA(\"AWS/ECS\", ServiceName, ClusterName)",
+          "hide": false,
+          "id": "healthy_ecs",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "",
+          "metricQueryType": 1,
+          "namespace": "",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "Healthy_ECS",
+          "region": "default",
+          "statistic": "Average"
+        }
+      ],
+      "title": "Services Running (Healthy)",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "greaterOrEqual",
+                  "options": {
+                    "value": 90
+                  }
+                },
+                "fieldName": "Value"
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "count"
+            ]
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "Applications with health score 70-90% (Yellow)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 19
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {
+          "titleSize": 16,
+          "valueSize": 48
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT AVG(m1) FROM (SELECT (Invocations - Errors) / Invocations * 100 AS m1 FROM SCHEMA(\"AWS/Lambda\", FunctionName))",
+          "id": "warning_lambda",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "",
+          "metricQueryType": 1,
+          "namespace": "",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "Warning_Apps",
+          "region": "default",
+          "statistic": "Average"
+        }
+      ],
+      "title": "Services Degraded (Warning)",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "greaterOrEqual",
+                  "options": {
+                    "value": 70
+                  }
+                },
+                "fieldName": "Value"
+              },
+              {
+                "config": {
+                  "id": "lower",
+                  "options": {
+                    "value": 90
+                  }
+                },
+                "fieldName": "Value"
+              }
+            ],
+            "match": "all",
+            "type": "include"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "count"
+            ]
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "Applications with health score < 70% (Red)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 19
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {
+          "titleSize": 16,
+          "valueSize": 48
+        },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "CloudWatch-UID"
+          },
+          "dimensions": {},
+          "expression": "SELECT AVG(m1) FROM (SELECT (Invocations - Errors) / Invocations * 100 AS m1 FROM SCHEMA(\"AWS/Lambda\", FunctionName))",
+          "id": "critical_apps",
+          "matchExact": false,
+          "metricEditorMode": 1,
+          "metricName": "",
+          "metricQueryType": 1,
+          "namespace": "",
+          "period": "",
+          "queryMode": "Metrics",
+          "refId": "Critical_Apps",
+          "region": "default",
+          "statistic": "Average"
+        }
+      ],
+      "title": "Services Down (Critical)",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "lower",
+                  "options": {
+                    "value": 70
+                  }
+                },
+                "fieldName": "Value"
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "count"
+            ]
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 20,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "## Health Score Calculation\n\n**Application health is calculated as the LOWEST score across all its components:**\n\n| Component | Health Calculation | Example |\n|-----------|-------------------|----------|\n| **Lambda** | `(Invocations - Errors) / Invocations * 100` | 950 success / 1000 total = 95% |\n| **ECS** | `100 - CPUUtilization` | 100 - 25% CPU = 75% |\n| **RDS** | `100 - CPUUtilization` | 100 - 15% CPU = 85% |\n| **API Gateway** | `(Total - 5XX Errors) / Total * 100` | 1950 success / 2000 = 97.5% |\n| **ALB** | `100 - (ResponseTime / Threshold * 100)` | 100 - (0.8s / 2s * 100) = 60% |\n| **DynamoDB** | `(Total - ThrottledReqs) / Total * 100` | 9900 success / 10000 = 99% |\n\n**Overall Application Health** = MIN(Lambda_Score, ECS_Score, RDS_Score, API_Score, ALB_Score, DynamoDB_Score)\n\n| Status | Score Range | Meaning |\n|--------|-------------|----------|\n| 🟢 **Green** | 90-100% | All components healthy |\n| 🟡 **Yellow** | 70-89% | One or more components degraded |\n| 🔴 **Red** | 0-69% | Critical component failure |\n\n**Note**: Click any application above to view component-level breakdown.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "Health Scoring Methodology",
+      "type": "text"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [
+    "executive",
+    "layer1",
+    "overview",
+    "multi-service",
+    "aws"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ]
+  },
+  "timezone": "",
+  "title": "Layer 1 - Executive Overview (Multi-Service AWS)",
+  "uid": "layer1-multiservice",
+  "version": 1,
+  "weekStart": ""
+}
