@@ -1,0 +1,40 @@
+extract-and-test-packer:
+  stage: .pre
+  image: 
+    name: hashicorp/packer:latest
+    entrypoint: [""]
+  script:
+    - echo "Extracting Packer binary"
+    - which packer
+    - cp $(which packer) ./packer-binary
+    - chmod +x ./packer-binary
+    
+    # Get detailed info
+    - file ./packer-binary
+    - ldd ./packer-binary || true  # Check dependencies
+    - ./packer-binary --version
+    
+    # Test with your actual template
+    - ./packer-binary validate ./packer/dev/ami_dev.json
+    
+    # Create a test report
+    - |
+      cat > packer-info.txt << EOF
+      Packer Version: $(./packer-binary --version)
+      Binary Type: $(file ./packer-binary)
+      Architecture: $(uname -m)
+      OS: $(cat /etc/os-release | grep PRETTY_NAME)
+      Tested: SUCCESS
+      EOF
+    
+    - cat packer-info.txt
+    
+  artifacts:
+    name: "packer-binary-tested-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - packer-binary
+      - packer-info.txt
+    expire_in: never
+  only:
+    - master
+  when: manual
