@@ -1,13 +1,11 @@
-// =====================================================
-// MEAN-REVERSION STRATEGY
-// =====================================================
+// E) Session Filter
+// RTH session (9:30 AM - 4:00 PM ET)
+t = time(timeframe.period, "0930-1600", "America/New_York")
+is_rth = not na(t)
 
-ema8 = ta.ema(close, 8)
-mr_overext_long = close < (ema8 - mr_overext_ticks * syminfo.mintick)
-mr_overext_short = close > (ema8 + mr_overext_ticks * syminfo.mintick)
+current_hour = hour(time("America/New_York"))
+current_min = minute(time("America/New_York"))
 
-spread_too_wide_mr = spread_ratio > 1.5
-
-mr_long_cond = strategy_mode == "Mean-Reversion" and can_trade and not cooldown_active_mr and strategy.position_size == 0 and is_choppy and vol_regime and mr_overext_long and range_expansion > mr_range_exp_min and aggression_score > mr_agg_thresh and not spread_too_wide_mr
-
-mr_short_cond = strategy_mode == "Mean-Reversion" and can_trade and not cooldown_active_mr and strategy.position_size == 0 and is_choppy and vol_regime and mr_overext_short and range_expansion > mr_range_exp_min and aggression_score < -mr_agg_thresh and not spread_too_wide_mr
+avoid_open = current_hour == 9 and current_min < (30 + avoid_open_mins)
+avoid_close = current_hour == 15 and current_min >= (60 - avoid_close_mins)
+session_ok = is_rth and not avoid_open and not avoid_close
