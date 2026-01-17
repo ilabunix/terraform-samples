@@ -1,0 +1,366 @@
+//@version=5
+strategy("Institutional Scalper [Momentum + Mean-Reversion]", 
+         overlay=true, 
+         pyramiding=0,
+         calc_on_every_tick=false,  // Set TRUE for live-like fills
+         process_orders_on_close=true,
+         default_qty_type=strategy.fixed, 
+         default_qty_value=1,
+         commission_type=strategy.commission.cash_per_contract,
+         commission_value=2.50,  // NQ: $2.50/side, ES: $1.25/side
+         slippage=2,             // 0.5 tick slippage
+         initial_capital=10000)
+
+// =====================================================
+// INPUTS
+// =====================================================
+
+// Strategy Selection
+strategy_mode = input.string("Momentum", "Strategy Mode", options=["Momentum", "Mean-Reversion"])
+
+// Microstructure Proxies
+aggression_len       = input.int(3, "Aggression Smoothing", minval=1, group="Microstructure")
+volume_norm_len      = input.int(20, "Volume Normalization", minval=5, group="Microstructure")
+atr_len              = input.int(5, "Micro ATR Length", minval=2, group="Microstructure")
+atr_ma_len           = input.int(60, "ATR MA Length (Vol Regime)", minval=10, group="Microstructure")
+wick_len             = input.int(10, "Spread Proxy Length", minval=5, group="Microstructure")
+
+// Regime Filters
+htf_timeframe        = input.timeframe("1", "HTF Trend Timeframe", group="Regime")
+adx_len              = input.int(14, "ADX Length", minval=5, group="Regime")
+adx_trend_thresh     = input.int(20, "ADX Trend Threshold", minval=10, group="Regime")
+adx_chop_thresh      = input.int(15, "ADX Chop Threshold", minval=5, group="Regime")
+
+// Momentum Parameters
+mom_agg_thresh       = input.float(0.3, "Aggression Threshold (Mom)", step=0.05, group="Momentum")
+mom_spread_max       = input.float(1.5, "Max Spread Ratio (Mom)", step=0.1, group="Momentum")
+mom_profit_ticks     = input.int(4, "Profit Target (Ticks)", minval=1, group="Momentum")
+mom_stop_ticks       = input.int(6, "Stop Loss (Ticks)", minval=1, group="Momentum")
+mom_time_stop_bars   = input.int(18, "Time Stop (Bars)", minval=5, group="Momentum")
+mom_be_trigger       = input.int(2, "Break-Even Trigger (Ticks)", minval=0, group="Momentum")
+mom_cooldown         = input.int(10, "Cooldown (Bars)", minval=1, group="Momentum")
+
+// Mean-Reversion Parameters
+mr_overext_ticks     = input.int(3, "Overextension (Ticks)", minval=1, group="Mean-Reversion")
+mr_agg_thresh        = input.float(0.1, "Aggression Reversal", step=0.05, group="Mean-Reversion")
+mr_range_exp_min     = input.float(1.5, "Min Range Expansion", step=0.1, group="Mean-Reversion")
+mr_profit_ticks      = input.int(5, "Profit Target (Ticks)", minval=1, group="Mean-Reversion")
+mr_stop_ticks        = input.int(7, "Stop Loss (Ticks)", minval=1, group="Mean-Reversion")
+mr_time_stop_bars    = input.int(24, "Time Stop (Bars)", minval=5, group="Mean-Reversion")
+mr_be_trigger        = input.int(3, "Break-Even Trigger (Ticks)", minval=0, group="Mean-Reversion")
+mr_cooldown          = input.int(12, "Cooldown (Bars)", minval=1, group="Mean-Reversion")
+
+// Risk Controls
+max_trades_day       = input.int(30, "Max Trades/Day", minval=1, group="Risk")
+max_daily_loss       = input.float(500, "Max Daily Loss ($)", minval=100, group="Risk")
+max_consec_losses    = input.int(4, "Max Consecutive Losses", minval=2, group="Risk")
+pause_after_losses   = input.int(180, "Pause After Max Losses (Bars)", minval=10, group="Risk")
+
+// Session
+avoid_open_mins      = input.int(15, "Avoid First N Minutes", minval=0, group="Session")
+avoid_close_mins     = input.int(15, "Avoid Last N Minutes", minval=0, group="Session")
+
+// Debug
+show_labels          = input.bool(false, "Show Entry/Exit Labels", group="Debug")
+show_levels          = input.bool(true, "Show TP/SL Lines", group="Debug")
+
+// =====================================================
+// MICROSTRUCTURE PROXIES
+// =====================================================
+
+// A) Aggression Score (Delta Volume Proxy)
+buy_vol = volume * ((close - low) / (high - low + 1e-10))
+sell_vol = volume * ((high - close) / (high - low + 1e-10))
+delta_vol = buy_vol - sell_vol
+aggression_score = ta.sma(delta_vol, aggression_len) / ta.sma(volume, volume_norm_len)
+
+// B) Volatility Regime
+micro_atr = ta.atr(atr_len)
+atr_ma = ta.sma(micro_atr, atr_ma_len)
+vol_regime = micro_atr > atr_ma  // true = high vol
+range_expansion = (high - low) / micro_atr
+
+// C) Spread Proxy (Wick/Body Ratio)
+avg_wick = ta.sma((high - math.max(open, close)) + (math.min(open, close) - low), wick_len)
+avg_body = ta.sma(math.abs(close - open), wick_len)
+spread_ratio = avg_wick / (avg_body + 1e-10)
+
+// D) Trend/Chop Filter
+htf_ema_fast = request.security(syminfo.tickerid, htf_timeframe, ta.ema(close, 8), lookahead=barmerge.lookahead_off)
+htf_ema_slow = request.security(syminfo.tickerid, htf_timeframe, ta.ema(close, 21), lookahead=barmerge.lookahead_off)
+htf_trend = htf_ema_fast > htf_ema_slow ? 1 : -1
+
+[diPlus, diMinus, adx_value] = ta.dmi(adx_len, adx_len)
+is_trending = adx_value > adx_trend_thresh
+is_choppy = adx_value < adx_chop_thresh
+
+// E) Session Filter
+t = time("America/New_York")
+is_rth = not na(t)
+current_hour = hour(time, "America/New_York")
+current_min = minute(time, "America/New_York")
+
+avoid_open = current_hour == 9 and current_min < (30 + avoid_open_mins)
+avoid_close = current_hour == 15 and current_min >= (60 - avoid_close_mins)
+session_ok = is_rth and not avoid_open and not avoid_close
+
+// =====================================================
+// STATE TRACKING
+// =====================================================
+
+var int trades_today = 0
+var float daily_pnl = 0.0
+var int consecutive_losses = 0
+var int pause_until_bar = 0
+var int last_exit_bar = 0
+var int bars_in_position = 0
+var float entry_price = na
+
+// Reset daily counters
+if ta.change(dayofweek)
+    trades_today := 0
+    daily_pnl := 0.0
+    consecutive_losses := 0
+    pause_until_bar := 0
+
+// Track PnL
+if strategy.closedtrades > 0
+    last_trade_profit = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    if last_trade_profit < 0
+        consecutive_losses += 1
+    else
+        consecutive_losses := 0
+    daily_pnl += last_trade_profit
+
+// Track position duration
+if strategy.position_size != 0
+    bars_in_position += 1
+    if na(entry_price)
+        entry_price := strategy.position_avg_price
+else
+    bars_in_position := 0
+    entry_price := na
+
+// =====================================================
+// RISK GATES
+// =====================================================
+
+// Hard stops
+daily_loss_exceeded = daily_pnl <= -max_daily_loss
+max_trades_exceeded = trades_today >= max_trades_day
+in_pause_period = bar_index < pause_until_bar
+spread_too_wide_mom = spread_ratio > mom_spread_max
+spread_too_wide_mr = spread_ratio > 1.5  // Same for MR
+
+// Cooldown
+bars_since_exit = bar_index - last_exit_bar
+cooldown_active_mom = bars_since_exit < mom_cooldown
+cooldown_active_mr = bars_since_exit < mr_cooldown
+
+// Circuit breaker
+if consecutive_losses >= max_consec_losses and pause_until_bar == 0
+    pause_until_bar := bar_index + pause_after_losses
+
+can_trade = session_ok and not daily_loss_exceeded and not max_trades_exceeded and not in_pause_period
+
+// =====================================================
+// MOMENTUM STRATEGY
+// =====================================================
+
+mom_long_cond = strategy_mode == "Momentum" and 
+                 can_trade and 
+                 not cooldown_active_mom and 
+                 strategy.position_size == 0 and 
+                 vol_regime and 
+                 is_trending and 
+                 htf_trend == 1 and 
+                 aggression_score > mom_agg_thresh and 
+                 not spread_too_wide_mom
+
+mom_short_cond = strategy_mode == "Momentum" and 
+                  can_trade and 
+                  not cooldown_active_mom and 
+                  strategy.position_size == 0 and 
+                  vol_regime and 
+                  is_trending and 
+                  htf_trend == -1 and 
+                  aggression_score < -mom_agg_thresh and 
+                  not spread_too_wide_mom
+
+if mom_long_cond
+    strategy.entry("MOM_L", strategy.long, comment="Momentum Long")
+    trades_today += 1
+    last_exit_bar := bar_index
+    if show_labels
+        label.new(bar_index, low, "▲ MOM", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+if mom_short_cond
+    strategy.entry("MOM_S", strategy.short, comment="Momentum Short")
+    trades_today += 1
+    last_exit_bar := bar_index
+    if show_labels
+        label.new(bar_index, high, "▼ MOM", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+// Momentum Exits
+if strategy.position_size > 0 and strategy_mode == "Momentum"  // Long
+    tp_price = entry_price + mom_profit_ticks * syminfo.mintick
+    sl_price = entry_price - mom_stop_ticks * syminfo.mintick
+    be_price = entry_price
+    
+    profit_ticks = (high - entry_price) / syminfo.mintick
+    
+    // Break-even
+    be_triggered = profit_ticks >= mom_be_trigger
+    
+    // Exits
+    if high >= tp_price
+        strategy.close("MOM_L", comment="TP")
+        last_exit_bar := bar_index
+    else if low <= (be_triggered ? be_price : sl_price)
+        strategy.close("MOM_L", comment=be_triggered ? "BE" : "SL")
+        last_exit_bar := bar_index
+    else if bars_in_position >= mom_time_stop_bars
+        strategy.close("MOM_L", comment="Time")
+        last_exit_bar := bar_index
+    
+    // Visual levels
+    if show_levels
+        line.new(bar_index[1], tp_price, bar_index, tp_price, color=color.green, width=1, style=line.style_dotted)
+        line.new(bar_index[1], be_triggered ? be_price : sl_price, bar_index, be_triggered ? be_price : sl_price, color=color.red, width=1, style=line.style_dotted)
+
+if strategy.position_size < 0 and strategy_mode == "Momentum"  // Short
+    tp_price = entry_price - mom_profit_ticks * syminfo.mintick
+    sl_price = entry_price + mom_stop_ticks * syminfo.mintick
+    be_price = entry_price
+    
+    profit_ticks = (entry_price - low) / syminfo.mintick
+    be_triggered = profit_ticks >= mom_be_trigger
+    
+    if low <= tp_price
+        strategy.close("MOM_S", comment="TP")
+        last_exit_bar := bar_index
+    else if high >= (be_triggered ? be_price : sl_price)
+        strategy.close("MOM_S", comment=be_triggered ? "BE" : "SL")
+        last_exit_bar := bar_index
+    else if bars_in_position >= mom_time_stop_bars
+        strategy.close("MOM_S", comment="Time")
+        last_exit_bar := bar_index
+    
+    if show_levels
+        line.new(bar_index[1], tp_price, bar_index, tp_price, color=color.green, width=1, style=line.style_dotted)
+        line.new(bar_index[1], be_triggered ? be_price : sl_price, bar_index, be_triggered ? be_price : sl_price, color=color.red, width=1, style=line.style_dotted)
+
+// =====================================================
+// MEAN-REVERSION STRATEGY
+// =====================================================
+
+ema8 = ta.ema(close, 8)
+mr_overext_long = close < (ema8 - mr_overext_ticks * syminfo.mintick)
+mr_overext_short = close > (ema8 + mr_overext_ticks * syminfo.mintick)
+
+mr_long_cond = strategy_mode == "Mean-Reversion" and 
+                can_trade and 
+                not cooldown_active_mr and 
+                strategy.position_size == 0 and 
+                is_choppy and 
+                vol_regime and 
+                mr_overext_long and 
+                range_expansion > mr_range_exp_min and 
+                aggression_score > mr_agg_thresh and 
+                not spread_too_wide_mr
+
+mr_short_cond = strategy_mode == "Mean-Reversion" and 
+                 can_trade and 
+                 not cooldown_active_mr and 
+                 strategy.position_size == 0 and 
+                 is_choppy and 
+                 vol_regime and 
+                 mr_overext_short and 
+                 range_expansion > mr_range_exp_min and 
+                 aggression_score < -mr_agg_thresh and 
+                 not spread_too_wide_mr
+
+if mr_long_cond
+    strategy.entry("MR_L", strategy.long, comment="Mean-Rev Long")
+    trades_today += 1
+    last_exit_bar := bar_index
+    if show_labels
+        label.new(bar_index, low, "▲ MR", color=color.blue, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+if mr_short_cond
+    strategy.entry("MR_S", strategy.short, comment="Mean-Rev Short")
+    trades_today += 1
+    last_exit_bar := bar_index
+    if show_labels
+        label.new(bar_index, high, "▼ MR", color=color.orange, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+// Mean-Reversion Exits
+if strategy.position_size > 0 and strategy_mode == "Mean-Reversion"  // Long
+    tp_price = entry_price + mr_profit_ticks * syminfo.mintick
+    sl_price = entry_price - mr_stop_ticks * syminfo.mintick
+    be_price = entry_price
+    
+    profit_ticks = (high - entry_price) / syminfo.mintick
+    be_triggered = profit_ticks >= mr_be_trigger
+    
+    // Mean reversion target (price returns to EMA)
+    mean_rev_hit = close >= ema8
+    
+    if high >= tp_price or mean_rev_hit
+        strategy.close("MR_L", comment=mean_rev_hit ? "Mean" : "TP")
+        last_exit_bar := bar_index
+    else if low <= (be_triggered ? be_price : sl_price)
+        strategy.close("MR_L", comment=be_triggered ? "BE" : "SL")
+        last_exit_bar := bar_index
+    else if bars_in_position >= mr_time_stop_bars
+        strategy.close("MR_L", comment="Time")
+        last_exit_bar := bar_index
+    
+    if show_levels
+        line.new(bar_index[1], tp_price, bar_index, tp_price, color=color.green, width=1, style=line.style_dotted)
+        line.new(bar_index[1], ema8, bar_index, ema8, color=color.yellow, width=1, style=line.style_solid)
+        line.new(bar_index[1], be_triggered ? be_price : sl_price, bar_index, be_triggered ? be_price : sl_price, color=color.red, width=1, style=line.style_dotted)
+
+if strategy.position_size < 0 and strategy_mode == "Mean-Reversion"  // Short
+    tp_price = entry_price - mr_profit_ticks * syminfo.mintick
+    sl_price = entry_price + mr_stop_ticks * syminfo.mintick
+    be_price = entry_price
+    
+    profit_ticks = (entry_price - low) / syminfo.mintick
+    be_triggered = profit_ticks >= mr_be_trigger
+    
+    mean_rev_hit = close <= ema8
+    
+    if low <= tp_price or mean_rev_hit
+        strategy.close("MR_S", comment=mean_rev_hit ? "Mean" : "TP")
+        last_exit_bar := bar_index
+    else if high >= (be_triggered ? be_price : sl_price)
+        strategy.close("MR_S", comment=be_triggered ? "BE" : "SL")
+        last_exit_bar := bar_index
+    else if bars_in_position >= mr_time_stop_bars
+        strategy.close("MR_S", comment="Time")
+        last_exit_bar := bar_index
+    
+    if show_levels
+        line.new(bar_index[1], tp_price, bar_index, tp_price, color=color.green, width=1, style=line.style_dotted)
+        line.new(bar_index[1], ema8, bar_index, ema8, color=color.yellow, width=1, style=line.style_solid)
+        line.new(bar_index[1], be_triggered ? be_price : sl_price, bar_index, be_triggered ? be_price : sl_price, color=color.red, width=1, style=line.style_dotted)
+
+// =====================================================
+// EMERGENCY KILL-SWITCH
+// =====================================================
+
+if daily_loss_exceeded
+    strategy.close_all(comment="Daily Loss Limit")
+    runtime.error("KILL-SWITCH: Daily loss limit exceeded")
+
+// =====================================================
+// PLOTS (Optional)
+// =====================================================
+
+plot(ema8, "EMA8 (MR Target)", color=color.yellow, linewidth=1, display=strategy_mode == "Mean-Reversion" ? display.all : display.none)
+plot(htf_ema_fast, "HTF EMA Fast", color=color.aqua, linewidth=1, display=display.none)
+plot(htf_ema_slow, "HTF EMA Slow", color=color.fuchsia, linewidth=1, display=display.none)
+
+bgcolor(not session_ok ? color.new(color.gray, 90) : na, title="Outside Session")
+bgcolor(in_pause_period ? color.new(color.red, 95) : na, title="Pause Period")
