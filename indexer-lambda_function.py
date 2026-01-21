@@ -62,8 +62,8 @@ def get_titan_embedding(text):
         body=json.dumps(payload)
     )
 
-    response_body = json.loads(response["body"].read())
-    return response_body["embedding"]
+    response_body = json.loads(response['body'].read())
+    return response_body['embedding']
 
 def index_document(doc):
     url = f"{OPENSEARCH_ENDPOINT}/{OPENSEARCH_INDEX}/_doc/{doc['id']}"
