@@ -1,0 +1,14 @@
+Incident Number: 
+
+Issue Recap:
+OCSE and OMEM emails are not being delivered to the FedMail monitor inbox. Initial testing indicates messages are leaving DDS, suggesting the issue may be downstream of DDS processing.
+
+Services/Applications Impacted:
+FedLine Web – OCSE / OMEM Email Notifications
+FedMail Monitoring
+
+Business/Customer Impact:
+Monitoring emails for OCSE and OMEM are not reaching the FedMail monitor inbox, reducing visibility into notification and monitoring workflows. No confirmation yet of end-user delivery impact.
+
+Next Steps:
+	•	Engage EUS to investigate downstream email delivery and FedMail routing.
