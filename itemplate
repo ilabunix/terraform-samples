@@ -1,9 +1,9 @@
 Incident Update:
 
-Investigation is ongoing for OCSE and OMEM emails not appearing in the FedMail monitor inbox. During the incident call, testing confirmed that emails sent to non-Microsoft mailboxes (e.g., Gmail) are being delivered successfully, while emails targeting Microsoft/Office 365 mailboxes are not consistently received.
+As of the latest checks, mail queues are actively draining and have now cleared. OCSE and OMEM emails are once again appearing in the FedMail monitoring inbox, and FedMail PROD monitors are reporting a GREEN status.
 
-DDS processing and outbound mail flow appear to be functioning as expected, with messages leaving DDS normally. EUS reviewed mail gateway logs and did not observe messages stuck in queues; current alerts indicating queuing may be delayed or false positives based on historical behavior.
+EUS confirmed that all queued emails for FRB domains have been processed successfully. Recent test emails sent earlier in the evening were received with delay but ultimately delivered once queues cleared. Overall email flow is now functioning as expected.
 
-Initial findings suggest the issue may be related to downstream email delivery or Office 365 handling rather than DDS. EUS is continuing to review specific message examples and logs to further validate behavior. No confirmed customer-facing functional impact beyond delayed or missing monitoring emails at this time.
+The observed behavior appears consistent with a transient downstream email delivery issue, potentially related to Microsoft/Office 365 handling. No DDS processing issues were identified during this period.
 
-Monitoring remains in place, and updates will be provided as additional findings become available.
+Monitoring will continue to ensure stability, and the incident will remain open pending confirmation of sustained normal operations and any additional updates from Microsoft.
