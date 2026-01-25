@@ -1,5 +1,5 @@
 Incident Update:
 
-WAS administrators have reverted the earlier certificate changes on the Zone 4A server and service has been restored on that node. Initial validation confirms connectivity has returned and health checks are responding as expected.
+UIM is now back online and responding as expected. WAS administrators have completed reverting the earlier certificate changes on Zone 5 and Zone 4B, following the successful rollback on Zone 4A.
 
-The team is now proceeding to revert the same certificate changes on Zone 5 and Zone 4B servers to ensure consistency across the environment.
+Initial validation confirms DDS and UIM health checks are recovering and application access has been restored.
