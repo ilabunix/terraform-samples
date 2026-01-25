@@ -1,18 +1,5 @@
-Incident Number: 
+Incident Update:
 
-Issue Recap:
-Alerts were triggered indicating DDS and UIM health checks are failing. Initial review shows degraded application responsiveness, and WebSphere Application Server (WAS) administrators have been engaged to investigate.
+WAS administrators have reverted the earlier certificate changes on the Zone 4A server and service has been restored on that node. Initial validation confirms connectivity has returned and health checks are responding as expected.
 
-Services/Applications Impacted:
-DDS
-UIM
-WebSphere Application Server (WAS)
-
-Business/Customer Impact:
-Health check failures may impact processing and availability of DDS and UIM services. Customer impact is currently being assessed.
-
-Next Steps:
-	•	Engage WAS administration team to investigate JVM health and application status.
-	•	Perform JVM restarts if required to restore normal service behavior.
-	•	Continue monitoring health checks and application performance.
-	•	Provide updates as more information becomes available.
+The team is now proceeding to revert the same certificate changes on Zone 5 and Zone 4B servers to ensure consistency across the environment.
