@@ -1,9 +1,18 @@
-Incident Update:
+Incident Number: 
 
-As of the latest checks, mail queues are actively draining and have now cleared. OCSE and OMEM emails are once again appearing in the FedMail monitoring inbox, and FedMail PROD monitors are reporting a GREEN status.
+Issue Recap:
+Alerts were triggered indicating DDS and UIM health checks are failing. Initial review shows degraded application responsiveness, and WebSphere Application Server (WAS) administrators have been engaged to investigate.
 
-EUS confirmed that all queued emails for FRB domains have been processed successfully. Recent test emails sent earlier in the evening were received with delay but ultimately delivered once queues cleared. Overall email flow is now functioning as expected.
+Services/Applications Impacted:
+DDS
+UIM
+WebSphere Application Server (WAS)
 
-The observed behavior appears consistent with a transient downstream email delivery issue, potentially related to Microsoft/Office 365 handling. No DDS processing issues were identified during this period.
+Business/Customer Impact:
+Health check failures may impact processing and availability of DDS and UIM services. Customer impact is currently being assessed.
 
-Monitoring will continue to ensure stability, and the incident will remain open pending confirmation of sustained normal operations and any additional updates from Microsoft.
+Next Steps:
+	•	Engage WAS administration team to investigate JVM health and application status.
+	•	Perform JVM restarts if required to restore normal service behavior.
+	•	Continue monitoring health checks and application performance.
+	•	Provide updates as more information becomes available.
