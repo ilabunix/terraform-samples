@@ -1,5 +1,10 @@
-Incident Update:
+Update:
 
-UIM is now back online and responding as expected. WAS administrators have completed reverting the earlier certificate changes on Zone 5 and Zone 4B, following the successful rollback on Zone 4A.
+Root cause identified as Salesforce Bridge being unable to connect to MQ.
 
-Initial validation confirms DDS and UIM health checks are recovering and application access has been restored.
+The issue was related to proxy connectivity. As a workaround, application code was modified to route traffic through proxy 3 instead of proxy 1. After the change, logs show successful MQ connection.
+
+Initial validation in UIM looks good at this time.
+We are currently waiting for the FL Access team to perform functional testing and confirm end-to-end processing.
+
+Next update will be provided after FL Access testing is completed.
