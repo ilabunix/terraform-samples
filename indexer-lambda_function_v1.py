@@ -64,10 +64,23 @@ def lambda_handler(event, context):
     }
 
     pages_url = f"{CONFLUENCE_URL}/wiki/api/v2/pages?spaceKey={CONFLUENCE_SPACE_KEY}&limit=50"
-    res = requests.get(pages_url, headers=headers)
-    res.raise_for_status()
-    pages = res.json()["results"]
+    #res = requests.get(pages_url, headers=headers)
+    #res.raise_for_status()
+    #pages = res.json()["results"]
+res = requests.get(pages_url, headers=headers)
 
+try:
+    res.raise_for_status()
+    data = res.json()
+    pages = data.get("results", [])
+except requests.exceptions.HTTPError as e:
+    print("❌ HTTP error:", e)
+    print("🔍 Response text:", res.text)
+    raise
+except json.JSONDecodeError as e:
+    print("❌ Failed to decode JSON")
+    print("🔍 Raw response:", res.text)
+    raise
     for page in pages:
         page_id = page["id"]
         title = page["title"]
