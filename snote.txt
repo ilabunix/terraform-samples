@@ -1,0 +1,11 @@
+Team,
+
+As part of the upcoming CFS2 Non-Prod Cloud Disaster Recovery Test (East region isolation), application teams have the option to participate in failover testing to the West region.
+
+Participation is encouraged for multi-region applications to validate failover procedures and ensure applications are functioning as expected.
+
+If a team chooses not to actively participate, please ensure someone is on alert during the exercise window and perform at least a cursory validation of the application after failover.
+
+Note: This CDRT primarily focuses on multi-region applications. Single-region apps may have different considerations.
+
+Please review your application architecture and confirm how your team plans to approach this exercise.
