@@ -1,13 +1,5 @@
-Team,
+The root cause was duplicate resource naming across East and West regions, which caused Terraform state conflicts and stale lifecycle errors in Grafana.
 
-As part of the upcoming CFS2 Non-Production Cloud Disaster Recovery Test (CDRT), the East region will be isolated during the exercise window.
+To resolve this, Mark is clearing the existing alert resources via the pipeline and then recreating them cleanly from a fresh state.
 
-Please note that application teams are not required to perform a failover to the West region as part of this test.
-
-For multi-region applications, teams may choose to participate in failover testing if they would like to validate their recovery process.
-
-If you do not plan to actively participate, please ensure someone from your team is available during the exercise window and perform at least a cursory validation check of your application once the failover activity occurs.
-
-This test primarily focuses on multi-region applications. Single-region applications may experience impact during the isolation window, and teams should plan accordingly.
-
-Let me know if you have any questions or if your team plans to actively participate.
+His view is that re-running the cleanup step serves as the backout plan. However, this approach does not restore the prior configuration — it simply re-cleans and rebuilds.
