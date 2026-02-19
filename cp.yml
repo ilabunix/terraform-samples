@@ -1,0 +1,662 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'BloomReach AMI Refresh Pipeline with CodeCommit, CodeBuild, and CodePipeline'
+
+Parameters:
+  CodeCommitRepositoryName:
+    Type: String
+    Default: 'bloomreach-ami-refresh'
+    Description: 'Name of the CodeCommit repository (must already exist)'
+  
+  CodeCommitBranch:
+    Type: String
+    Default: 'master'
+    Description: 'Branch to monitor for changes'
+  
+  MasterAdminRoleArn:
+    Type: String
+    Description: 'ARN of the master admin role for deployments'
+    Default: 'arn:aws:iam::ACCOUNT_ID:role/master-admin-role'
+  
+  BaseAmiOwnerId:
+    Type: String
+    Default: '465831528245'
+    Description: 'AWS Account ID that owns the base AMI'
+  
+  SNSTopicEmail:
+    Type: String
+    Description: 'Email address for manual approval notifications'
+    Default: 'your-email@example.com'
+
+Resources:
+  # SNS Topic for Approvals
+  ApprovalTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: bloomreach-ami-pipeline-approvals
+      DisplayName: 'BloomReach AMI Pipeline Approvals'
+      Subscription:
+        - Endpoint: !Ref SNSTopicEmail
+          Protocol: email
+
+  # S3 Bucket for Pipeline Artifacts
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'bloomreach-ami-pipeline-artifacts-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # CodePipeline Service Role
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: bloomreach-ami-codepipeline-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-09'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSCodePipelineFullAccess'
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-09'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'codecommit:GetBranch'
+                  - 'codecommit:GetCommit'
+                  - 'codecommit:UploadArchive'
+                  - 'codecommit:GetUploadArchiveStatus'
+                  - 'codecommit:CancelUploadArchive'
+                Resource: !Sub 'arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CodeCommitRepositoryName}'
+              - Effect: Allow
+                Action:
+                  - 'codebuild:BatchGetBuilds'
+                  - 'codebuild:StartBuild'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:PutObject'
+                  - 's3:GetBucketLocation'
+                  - 's3:ListBucket'
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub '${ArtifactBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource: !Ref ApprovalTopic
+
+  # CodeBuild Service Role
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: bloomreach-ami-codebuild-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-09'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-09'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub '${ArtifactBucket.Arn}/*'
+                  - 'arn:aws:s3:::awc-n-fi-development-bloomreach-ami-refresh/*'
+              - Effect: Allow
+                Action:
+                  - 's3:ListBucket'
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - 'arn:aws:s3:::awc-n-fi-development-bloomreach-ami-refresh'
+              - Effect: Allow
+                Action:
+                  - 'ec2:CreateImage'
+                  - 'ec2:DeregisterImage'
+                  - 'ec2:DescribeImages'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeRegions'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeSnapshots'
+                  - 'ec2:DescribeSubnets'
+                  - 'ec2:DescribeVpcs'
+                  - 'ec2:CreateSnapshot'
+                  - 'ec2:DeleteSnapshot'
+                  - 'ec2:CreateTags'
+                  - 'ec2:ModifyImageAttribute'
+                  - 'ec2:ModifySnapshotAttribute'
+                  - 'ec2:RunInstances'
+                  - 'ec2:TerminateInstances'
+                  - 'ec2:StopInstances'
+                  - 'ec2:StartInstances'
+                  - 'ec2:GetPasswordData'
+                  - 'ec2:CreateKeyPair'
+                  - 'ec2:DeleteKeyPair'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DetachVolume'
+                  - 'ec2:AttachVolume'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: !Ref MasterAdminRoleArn
+              - Effect: Allow
+                Action:
+                  - 'sts:AssumeRole'
+                Resource: !Ref MasterAdminRoleArn
+
+  # CodeBuild Projects with Environment Variables
+  ValidateProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-validate
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: BASE_AMI_OWNER_ID
+            Value: !Ref BaseAmiOwnerId
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com"
+          - Name: D_IMAGE_VERSION
+            Value: "11.0.14"
+          - Name: AWS_DEFAULT_REGION
+            Value: "us-east-2"
+          - Name: NONCUSTVPC_ID
+            Value: "vpc-05def321b56a5c6a7"
+          - Name: PUBLICVPC_ID
+            Value: "vpc-08c94d8e35c5c5887"
+          - Name: NONCUSTSUBNET_ID
+            Value: "subnet-06bd3c06adb1bedbq"
+          - Name: PRIVATESUBNET_ID
+            Value: "subnet-0fa9d3cc9cfa30193"
+          - Name: NONCUSTSG_ID
+            Value: "sg-0b3cce454eec38ab1"
+          - Name: PUBLICSG_ID
+            Value: "sg-0a2f22a4187db3b66"
+          - Name: BASE_AMI_OWNER
+            Value: "465831528245"
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/buildspec-validate.yml
+      TimeoutInMinutes: 10
+
+  SilverAuthoringProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-silver-authoring
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: BASE_AMI_OWNER_ID
+            Value: !Ref BaseAmiOwnerId
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com"
+          - Name: D_IMAGE_VERSION
+            Value: "11.0.14"
+          - Name: AWS_DEFAULT_REGION
+            Value: "us-east-2"
+          - Name: NONCUSTVPC_ID
+            Value: "vpc-05def321b56a5c6a7"
+          - Name: PUBLICVPC_ID
+            Value: "vpc-08c94d8e35c5c5887"
+          - Name: NONCUSTSUBNET_ID
+            Value: "subnet-06bd3c06adb1bedbq"
+          - Name: PRIVATESUBNET_ID
+            Value: "subnet-0fa9d3cc9cfa30193"
+          - Name: NONCUSTSG_ID
+            Value: "sg-0b3cce454eec38ab1"
+          - Name: PUBLICSG_ID
+            Value: "sg-0a2f22a4187db3b66"
+          - Name: BASE_AMI_OWNER
+            Value: "465831528245"
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/buildspec-silver-ami-authoring.yml
+      TimeoutInMinutes: 30
+
+  SilverDeliveryProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-silver-delivery
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: BASE_AMI_OWNER_ID
+            Value: !Ref BaseAmiOwnerId
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com"
+          - Name: D_IMAGE_VERSION
+            Value: "11.0.14"
+          - Name: AWS_DEFAULT_REGION
+            Value: "us-east-2"
+          - Name: NONCUSTVPC_ID
+            Value: "vpc-05def321b56a5c6a7"
+          - Name: PUBLICVPC_ID
+            Value: "vpc-08c94d8e35c5c5887"
+          - Name: NONCUSTSUBNET_ID
+            Value: "subnet-06bd3c06adb1bedbq"
+          - Name: PRIVATESUBNET_ID
+            Value: "subnet-0fa9d3cc9cfa30193"
+          - Name: NONCUSTSG_ID
+            Value: "sg-0b3cce454eec38ab1"
+          - Name: PUBLICSG_ID
+            Value: "sg-0a2f22a4187db3b66"
+          - Name: BASE_AMI_OWNER
+            Value: "465831528245"
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/buildspec-silver-ami-delivery.yml
+      TimeoutInMinutes: 30
+
+  BronzeAuthoringProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-bronze-authoring
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: BASE_AMI_OWNER_ID
+            Value: !Ref BaseAmiOwnerId
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com"
+          - Name: D_IMAGE_VERSION
+            Value: "11.0.14"
+          - Name: AWS_DEFAULT_REGION
+            Value: "us-east-2"
+          - Name: NONCUSTVPC_ID
+            Value: "vpc-05def321b56a5c6a7"
+          - Name: PUBLICVPC_ID
+            Value: "vpc-08c94d8e35c5c5887"
+          - Name: NONCUSTSUBNET_ID
+            Value: "subnet-06bd3c06adb1bedbq"
+          - Name: PRIVATESUBNET_ID
+            Value: "subnet-0fa9d3cc9cfa30193"
+          - Name: NONCUSTSG_ID
+            Value: "sg-0b3cce454eec38ab1"
+          - Name: PUBLICSG_ID
+            Value: "sg-0a2f22a4187db3b66"
+          - Name: BASE_AMI_OWNER
+            Value: "465831528245"
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/buildspec-bronze-ami-authoring.yml
+      TimeoutInMinutes: 30
+
+  BronzeDeliveryProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-bronze-delivery
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: BASE_AMI_OWNER_ID
+            Value: !Ref BaseAmiOwnerId
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com"
+          - Name: D_IMAGE_VERSION
+            Value: "11.0.14"
+          - Name: AWS_DEFAULT_REGION
+            Value: "us-east-2"
+          - Name: NONCUSTVPC_ID
+            Value: "vpc-05def321b56a5c6a7"
+          - Name: PUBLICVPC_ID
+            Value: "vpc-08c94d8e35c5c5887"
+          - Name: NONCUSTSUBNET_ID
+            Value: "subnet-06bd3c06adb1bedbq"
+          - Name: PRIVATESUBNET_ID
+            Value: "subnet-0fa9d3cc9cfa30193"
+          - Name: NONCUSTSG_ID
+            Value: "sg-0b3cce454eec38ab1"
+          - Name: PUBLICSG_ID
+            Value: "sg-0a2f22a4187db3b66"
+          - Name: BASE_AMI_OWNER
+            Value: "465831528245"
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/buildspec-bronze-ami-delivery.yml
+      TimeoutInMinutes: 30
+
+  ShareAmisProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-share-amis
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com"
+          - Name: AWS_DEFAULT_REGION
+            Value: "us-east-2"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/buildspec-share-amis.yml
+      TimeoutInMinutes: 15
+
+  # CodePipeline
+  BloomReachAMIPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: bloomreach-ami-refresh-pipeline
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        # Stage 1: Source
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: '1'
+              Configuration:
+                RepositoryName: !Ref CodeCommitRepositoryName
+                BranchName: !Ref CodeCommitBranch
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: SourceOutput
+        
+        # Stage 2: Validate
+        - Name: Validate
+          Actions:
+            - Name: ValidateTemplates
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref ValidateProject
+              InputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+        
+        # Stage 3: Manual Approval Before Silver Build
+        - Name: ApprovalBeforeSilverBuild
+          Actions:
+            - Name: ManualApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref ApprovalTopic
+                CustomData: 'Approve to start Silver AMI builds (Authoring and Delivery)'
+              RunOrder: 1
+        
+        # Stage 4: Build Silver AMIs (Parallel)
+        - Name: BuildSilverAMIs
+          Actions:
+            - Name: BuildSilverAuthoring
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref SilverAuthoringProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: SilverAuthoringOutput
+              RunOrder: 1
+            
+            - Name: BuildSilverDelivery
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref SilverDeliveryProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: SilverDeliveryOutput
+              RunOrder: 1
+        
+        # Stage 5: Build Bronze AMIs (Can start individually as Silver completes)
+        - Name: BuildBronzeAMIs
+          Actions:
+            - Name: BuildBronzeAuthoring
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BronzeAuthoringProject
+                PrimarySource: SourceOutput
+              InputArtifacts:
+                - Name: SourceOutput
+                - Name: SilverAuthoringOutput
+              OutputArtifacts:
+                - Name: BronzeAuthoringOutput
+              RunOrder: 1
+            
+            - Name: BuildBronzeDelivery
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BronzeDeliveryProject
+                PrimarySource: SourceOutput
+              InputArtifacts:
+                - Name: SourceOutput
+                - Name: SilverDeliveryOutput
+              OutputArtifacts:
+                - Name: BronzeDeliveryOutput
+              RunOrder: 1
+        
+        # Stage 6: Manual Approval Before Sharing
+        - Name: ApprovalBeforeSharing
+          Actions:
+            - Name: ManualApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                NotificationArn: !Ref ApprovalTopic
+                CustomData: 'Approve to share Bronze AMIs to TEST, QA, and PROD accounts'
+              RunOrder: 1
+        
+        # Stage 7: Share AMIs
+        - Name: ShareAMIs
+          Actions:
+            - Name: ShareBronzeAMIs
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref ShareAmisProject
+                PrimarySource: SourceOutput
+              InputArtifacts:
+                - Name: SourceOutput
+                - Name: SilverAuthoringOutput
+                - Name: SilverDeliveryOutput
+                - Name: BronzeAuthoringOutput
+                - Name: BronzeDeliveryOutput
+              RunOrder: 1
+
+  # EventBridge Rule for CodeCommit trigger
+  PipelineTriggerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'Trigger BloomReach AMI Pipeline on CodeCommit changes'
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - 'CodeCommit Repository State Change'
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - !Ref CodeCommitBranch
+        resources:
+          - !Sub 'arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CodeCommitRepositoryName}'
+      State: ENABLED
+      Targets:
+        - Arn: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${BloomReachAMIPipeline}'
+          RoleArn: !GetAtt EventBridgeRole.Arn
+          Id: CodePipelineTarget
+
+  # EventBridge Role
+  EventBridgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: bloomreach-eventbridge-pipeline-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-09'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: StartPipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-09'
+            Statement:
+              - Effect: Allow
+                Action: 'codepipeline:StartPipelineExecution'
+                Resource: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${BloomReachAMIPipeline}'
+
+Outputs:
+  PipelineName:
+    Description: 'Name of the CodePipeline'
+    Value: !Ref BloomReachAMIPipeline
+  
+  ArtifactBucketName:
+    Description: 'S3 Bucket for pipeline artifacts'
+    Value: !Ref ArtifactBucket
+  
+  SNSTopicArn:
+    Description: 'SNS Topic for manual approvals'
+    Value: !Ref ApprovalTopic
+  
+  CodeBuildRoleArn:
+    Description: 'IAM Role ARN for CodeBuild projects'
+    Value: !GetAtt CodeBuildServiceRole.Arn
+  
+  PipelineConsoleUrl:
+    Description: 'AWS Console URL for the pipeline'
+    Value: !Sub 'https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${BloomReachAMIPipeline}/view?region=${AWS::Region}'
