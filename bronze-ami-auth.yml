@@ -1,0 +1,50 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Installing Packer"
+      - cp tools/packer/packer /usr/local/bin/packer
+      - chmod +x /usr/local/bin/packer
+      - packer --version
+      
+  pre_build:
+    commands:
+      - echo "=== Starting Bronze AMI Authoring Build ==="
+      
+      # Read Silver AMI ID from artifact
+      - ls -la
+      - |
+        if [ -f silver_authoring_ami_id.txt ]; then
+          export silver_ami_auth=$(cat silver_authoring_ami_id.txt)
+          echo "✅ Using Silver Authoring AMI = $silver_ami_auth"
+        else
+          echo "ERROR: silver_authoring_ami_id.txt not found!"
+          exit 1
+        fi
+      
+      - export BASE_AMI_OWNER="$BASE_AMI_OWNER_ID"
+      - echo "Base AMI Owner = $BASE_AMI_OWNER"
+      
+  build:
+    commands:
+      - echo "Packer build started for BloomReach Authoring Bronze AMI"
+      - echo "SILVER_AUTH_AMI_ID=$silver_ami_auth"
+      - packer build -debug ./packer/bloomreach_bronze_authoring_ami.json
+      - ls -l
+      
+      # Extract Bronze AMI ID
+      - |
+        if [ -f bronze_authoring_manifest.json ]; then
+          awk 'match($0, /ami-[a-z0-9]+/) {print substr($0, RSTART, RLENGTH)}' bronze_authoring_manifest.json | awk 'sub("$", "")' > bronze_authoring_ami_id.txt
+          export BRONZE_AUTH_AMI_ID=$(cat bronze_authoring_ami_id.txt)
+          echo "✅ Bronze Authoring AMI ID = $BRONZE_AUTH_AMI_ID"
+        else
+          echo "ERROR: Manifest file not found!"
+          exit 1
+        fi
+      
+artifacts:
+  files:
+    - bronze_authoring_manifest.json
+    - bronze_authoring_ami_id.txt
