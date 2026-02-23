@@ -1,0 +1,64 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Installing Packer"
+      - cp tools/packer/packer /usr/local/bin/packer
+      - chmod +x /usr/local/bin/packer
+      - packer --version
+      
+  pre_build:
+    commands:
+      - echo "=== Starting Silver AMI Authoring Build ==="
+      - export BASE_AMI_NAME=$(cat nit_base_ami_name.txt)
+      - echo "Base AMI Name = $BASE_AMI_NAME"
+      - export BASE_AMI_OWNER="$BASE_AMI_OWNER_ID"
+      - echo "Base AMI Owner = $BASE_AMI_OWNER"
+      
+      - echo "=== Assuming Role in Target Account ==="
+      - echo "Role ARN = $AWS_ROLE"
+      
+      # Assume role and save to file
+      - aws sts assume-role --role-arn $AWS_ROLE --role-session-name packer-silver-authoring-build --duration-seconds 3600 > /tmp/assumed-role.json
+      
+      # Export credentials one at a time (NOT in a multi-line block)
+      - export AWS_ACCESS_KEY_ID=$(jq -r '.Credentials.AccessKeyId' /tmp/assumed-role.json)
+      - export AWS_SECRET_ACCESS_KEY=$(jq -r '.Credentials.SecretAccessKey' /tmp/assumed-role.json)
+      - export AWS_SESSION_TOKEN=$(jq -r '.Credentials.SessionToken' /tmp/assumed-role.json)
+      
+      # Verify credentials are set
+      - echo "Verifying credentials..."
+      - test -n "$AWS_ACCESS_KEY_ID" && echo "✅ AWS_ACCESS_KEY_ID is set" || (echo "❌ AWS_ACCESS_KEY_ID not set" && exit 1)
+      - test -n "$AWS_SECRET_ACCESS_KEY" && echo "✅ AWS_SECRET_ACCESS_KEY is set" || (echo "❌ AWS_SECRET_ACCESS_KEY not set" && exit 1)
+      - test -n "$AWS_SESSION_TOKEN" && echo "✅ AWS_SESSION_TOKEN is set" || (echo "❌ AWS_SESSION_TOKEN not set" && exit 1)
+      
+      - echo "Access Key: ${AWS_ACCESS_KEY_ID:0:10}..."
+      
+  build:
+    commands:
+      - echo "=== Starting Packer Build ==="
+      - echo "Credentials check before Packer:"
+      - env | grep AWS_ACCESS_KEY_ID || echo "WARNING: AWS_ACCESS_KEY_ID not in environment"
+      - env | grep AWS_SECRET_ACCESS_KEY || echo "WARNING: AWS_SECRET_ACCESS_KEY not in environment"
+      - env | grep AWS_SESSION_TOKEN || echo "WARNING: AWS_SESSION_TOKEN not in environment"
+      
+      - echo "Running Packer build..."
+      - packer build -debug ./packer/bloomreach_silver_authoring_ami.json
+      - ls -l
+      
+      # Extract AMI ID from manifest
+      - |
+        if [ -f silver_authoring_manifest.json ]; then
+          awk 'match($0, /ami-[a-z0-9]+/) {print substr($0, RSTART, RLENGTH)}' silver_authoring_manifest.json | awk 'sub("$", "")' > silver_authoring_ami_id.txt
+          export SILVER_AUTH_AMI_ID=$(cat silver_authoring_ami_id.txt)
+          echo "✅ Silver Authoring AMI ID = $SILVER_AUTH_AMI_ID"
+        else
+          echo "ERROR: Manifest file not found!"
+          exit 1
+        fi
+      
+artifacts:
+  files:
+    - silver_authoring_manifest.json
+    - silver_authoring_ami_id.txt
