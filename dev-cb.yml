@@ -1,0 +1,250 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CodeBuild projects for BloomReach AMI builds in Dev Account'
+
+Parameters:
+  CodeBuildRoleArn:
+    Type: String
+    Default: 'arn:aws:iam::465831528245:role/codebuild-service-role'
+  
+  ArtifactBucket:
+    Type: String
+    Default: 'bloomreach-ami-artifacts-dev-465831528245'
+
+Resources:
+  SilverAuthoringProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-silver-authoring
+      ServiceRole: !Ref CodeBuildRoleArn
+      
+      VpcConfig:
+        VpcId: vpc-05def321b56a5c6a7
+        Subnets:
+          - subnet-06bd3c06adb1bedbq
+        SecurityGroupIds:
+          - sg-0b3cce454eec38ab1
+      
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactBucket
+        Path: builds/silver-authoring
+        NamespaceType: BUILD_ID
+        Packaging: ZIP
+      
+      Source:
+        Type: S3
+        Location: !Sub '${ArtifactBucket}/source/source.zip'
+        BuildSpec: buildspecs/buildspec-silver-ami-authoring.yml
+      
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com,*.s3.us-east-2.amazonaws.com,sts.us-east-2.amazonaws.com,sts.amazonaws.com,iam.amazonaws.com,ec2.amazonaws.com"
+          - Name: NONCUSTVPC_ID
+            Value: "vpc-05def321b56a5c6a7"
+          - Name: NONCUSTSUBNET_ID
+            Value: "subnet-06bd3c06adb1bedbq"
+          - Name: NONCUSTSG_ID
+            Value: "sg-0b3cce454eec38ab1"
+          - Name: BASE_AMI_OWNER_ID
+            Value: "465831528245"
+      
+      TimeoutInMinutes: 30
+
+  SilverDeliveryProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-silver-delivery
+      ServiceRole: !Ref CodeBuildRoleArn
+      
+      VpcConfig:
+        VpcId: vpc-05def321b56a5c6a7
+        Subnets:
+          - subnet-06bd3c06adb1bedbq
+        SecurityGroupIds:
+          - sg-0b3cce454eec38ab1
+      
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactBucket
+        Path: builds/silver-delivery
+        NamespaceType: BUILD_ID
+        Packaging: ZIP
+      
+      Source:
+        Type: S3
+        Location: !Sub '${ArtifactBucket}/source/source.zip'
+        BuildSpec: buildspecs/buildspec-silver-ami-delivery.yml
+      
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com,*.s3.us-east-2.amazonaws.com,sts.us-east-2.amazonaws.com,sts.amazonaws.com,iam.amazonaws.com,ec2.amazonaws.com"
+          - Name: PUBLICVPC_ID
+            Value: "vpc-08c94d8e35c5c5887"
+          - Name: PRIVATESUBNET_ID
+            Value: "subnet-0fa9d3cc9cfa30193"
+          - Name: PUBLICSG_ID
+            Value: "sg-0a2f22a4187db3b66"
+          - Name: BASE_AMI_OWNER_ID
+            Value: "465831528245"
+      
+      TimeoutInMinutes: 30
+
+  BronzeAuthoringProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-bronze-authoring
+      ServiceRole: !Ref CodeBuildRoleArn
+      
+      VpcConfig:
+        VpcId: vpc-05def321b56a5c6a7
+        Subnets:
+          - subnet-06bd3c06adb1bedbq
+        SecurityGroupIds:
+          - sg-0b3cce454eec38ab1
+      
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactBucket
+        Path: builds/bronze-authoring
+        NamespaceType: BUILD_ID
+        Packaging: ZIP
+      
+      Source:
+        Type: S3
+        Location: !Sub '${ArtifactBucket}/source/source.zip'
+        BuildSpec: buildspecs/buildspec-bronze-ami-authoring.yml
+      
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com,*.s3.us-east-2.amazonaws.com,sts.us-east-2.amazonaws.com,sts.amazonaws.com,iam.amazonaws.com,ec2.amazonaws.com"
+          - Name: NONCUSTVPC_ID
+            Value: "vpc-05def321b56a5c6a7"
+          - Name: NONCUSTSUBNET_ID
+            Value: "subnet-06bd3c06adb1bedbq"
+          - Name: NONCUSTSG_ID
+            Value: "sg-0b3cce454eec38ab1"
+          - Name: BASE_AMI_OWNER_ID
+            Value: "465831528245"
+      
+      TimeoutInMinutes: 30
+
+  BronzeDeliveryProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-bronze-delivery
+      ServiceRole: !Ref CodeBuildRoleArn
+      
+      VpcConfig:
+        VpcId: vpc-05def321b56a5c6a7
+        Subnets:
+          - subnet-06bd3c06adb1bedbq
+        SecurityGroupIds:
+          - sg-0b3cce454eec38ab1
+      
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactBucket
+        Path: builds/bronze-delivery
+        NamespaceType: BUILD_ID
+        Packaging: ZIP
+      
+      Source:
+        Type: S3
+        Location: !Sub '${ArtifactBucket}/source/source.zip'
+        BuildSpec: buildspecs/buildspec-bronze-ami-delivery.yml
+      
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+          - Name: PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTPS_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: HTTP_PROXY
+            Value: "http://giproxy.frb.org:8080"
+          - Name: NO_PROXY
+            Value: "localhost,127.0.0.1,169.254.169.254,frb.org,frb.pvt,ec2.us-east-2.amazonaws.com,s3.us-east-2.amazonaws.com,s3-fips.us-east-2.amazonaws.com,s3.us-east-2.vpce.amazonaws.com,*.s3.us-east-2.amazonaws.com,sts.us-east-2.amazonaws.com,sts.amazonaws.com,iam.amazonaws.com,ec2.amazonaws.com"
+          - Name: PUBLICVPC_ID
+            Value: "vpc-08c94d8e35c5c5887"
+          - Name: PRIVATESUBNET_ID
+            Value: "subnet-0fa9d3cc9cfa30193"
+          - Name: PUBLICSG_ID
+            Value: "sg-0a2f22a4187db3b66"
+          - Name: BASE_AMI_OWNER_ID
+            Value: "465831528245"
+      
+      TimeoutInMinutes: 30
+
+  ShareAmisProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-share-amis
+      ServiceRole: !Ref CodeBuildRoleArn
+      
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactBucket
+        Path: builds/share-amis
+        NamespaceType: BUILD_ID
+        Packaging: ZIP
+      
+      Source:
+        Type: S3
+        Location: !Sub '${ArtifactBucket}/source/source.zip'
+        BuildSpec: buildspecs/buildspec-share-amis.yml
+      
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: AWS_ROLE
+            Value: "arn:aws:iam::465831528245:role/fedlineoperations-gitlab-deployment-role"
+          - Name: TEST_ACCOUNT
+            Value: "175809624659"
+          - Name: QA_ACCOUNT
+            Value: "762649877014"
+          - Name: PROD_ACCOUNT
+            Value: "609253628652"
+      
+      TimeoutInMinutes: 15
