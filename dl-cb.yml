@@ -1,0 +1,298 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'BloomReach AMI Pipeline in Delivery Account'
+
+Parameters:
+  CodeCommitRepositoryName:
+    Type: String
+    Default: 'bloomreach-ami-refresh'
+  
+  CodeCommitBranch:
+    Type: String
+    Default: 'master'
+  
+  ExistingCodePipelineRoleArn:
+    Type: String
+    Description: 'ARN of existing CodePipeline role'
+  
+  ExistingCodeBuildRoleArn:
+    Type: String
+    Description: 'ARN of existing CodeBuild role (for validate project)'
+  
+  DevAccountCodeBuildRole:
+    Type: String
+    Default: 'arn:aws:iam::465831528245:role/codebuild-service-role'
+  
+  DevAccountArtifactBucket:
+    Type: String
+    Default: 'bloomreach-ami-artifacts-dev-465831528245'
+  
+  SNSTopicEmail:
+    Type: String
+    Description: 'Email for approval notifications'
+
+Resources:
+  # SNS Topic for Approvals
+  ApprovalTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: bloomreach-ami-pipeline-approvals
+      DisplayName: 'BloomReach AMI Pipeline Approvals'
+      Subscription:
+        - Endpoint: !Ref SNSTopicEmail
+          Protocol: email
+
+  # Local S3 bucket for pipeline metadata
+  PipelineMetadataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'pipeline-metadata-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Validate Project (runs locally in delivery account)
+  ValidateProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: bloomreach-ami-validate
+      ServiceRole: !Ref ExistingCodeBuildRoleArn
+      
+      Artifacts:
+        Type: CODEPIPELINE
+      
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/buildspec-validate.yml
+      
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables:
+          - Name: BASE_AMI_OWNER_ID
+            Value: "465831528245"
+      
+      TimeoutInMinutes: 10
+
+  # EventBridge Role for Pipeline Trigger
+  EventBridgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StartPipelineExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Pipeline}'
+
+  # EventBridge Rule to trigger pipeline on CodeCommit push
+  PipelineTriggerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: bloomreach-pipeline-trigger
+      Description: 'Trigger pipeline on CodeCommit push'
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - CodeCommit Repository State Change
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - !Ref CodeCommitBranch
+        resources:
+          - !Sub 'arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CodeCommitRepositoryName}'
+      State: ENABLED
+      Targets:
+        - Arn: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Pipeline}'
+          RoleArn: !GetAtt EventBridgeRole.Arn
+          Id: CodePipelineTarget
+
+  # CodePipeline
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: bloomreach-ami-refresh-pipeline
+      RoleArn: !Ref ExistingCodePipelineRoleArn
+      
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineMetadataBucket
+      
+      Stages:
+        # Stage 1: Source from CodeCommit
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: '1'
+              Configuration:
+                RepositoryName: !Ref CodeCommitRepositoryName
+                BranchName: !Ref CodeCommitBranch
+              OutputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+        
+        # Stage 2: Validate
+        - Name: Validate
+          Actions:
+            - Name: ValidatePacker
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref ValidateProject
+              InputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+        
+        # Stage 3: Manual Approval
+        - Name: ApprovalBeforeSilverBuild
+          Actions:
+            - Name: ManualApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                CustomData: 'Approve to start Silver AMI builds in dev account'
+                NotificationArn: !Ref ApprovalTopic
+              RunOrder: 1
+        
+        # Stage 4: Build Silver AMIs (cross-account)
+        - Name: BuildSilverAMIs
+          Actions:
+            - Name: BuildSilverAuthoring
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: bloomreach-ami-silver-authoring
+              RoleArn: !Ref DevAccountCodeBuildRole
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: SilverAuthoringOutput
+              RunOrder: 1
+            
+            - Name: BuildSilverDelivery
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: bloomreach-ami-silver-delivery
+              RoleArn: !Ref DevAccountCodeBuildRole
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: SilverDeliveryOutput
+              RunOrder: 1
+        
+        # Stage 5: Build Bronze AMIs (cross-account)
+        - Name: BuildBronzeAMIs
+          Actions:
+            - Name: BuildBronzeAuthoring
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: bloomreach-ami-bronze-authoring
+              RoleArn: !Ref DevAccountCodeBuildRole
+              InputArtifacts:
+                - Name: SourceOutput
+                - Name: SilverAuthoringOutput
+              OutputArtifacts:
+                - Name: BronzeAuthoringOutput
+              RunOrder: 1
+            
+            - Name: BuildBronzeDelivery
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: bloomreach-ami-bronze-delivery
+              RoleArn: !Ref DevAccountCodeBuildRole
+              InputArtifacts:
+                - Name: SourceOutput
+                - Name: SilverDeliveryOutput
+              OutputArtifacts:
+                - Name: BronzeDeliveryOutput
+              RunOrder: 1
+        
+        # Stage 6: Approval before sharing
+        - Name: ApprovalBeforeSharing
+          Actions:
+            - Name: ManualApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                CustomData: 'Approve to share Bronze AMIs to TEST, QA, and PROD accounts'
+                NotificationArn: !Ref ApprovalTopic
+              RunOrder: 1
+        
+        # Stage 7: Share AMIs
+        - Name: ShareAMIs
+          Actions:
+            - Name: ShareAMIsToAccounts
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: bloomreach-ami-share-amis
+              RoleArn: !Ref DevAccountCodeBuildRole
+              InputArtifacts:
+                - Name: SourceOutput
+                - Name: SilverAuthoringOutput
+                - Name: SilverDeliveryOutput
+                - Name: BronzeAuthoringOutput
+                - Name: BronzeDeliveryOutput
+              RunOrder: 1
+
+Outputs:
+  PipelineUrl:
+    Description: 'CodePipeline URL'
+    Value: !Sub 'https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${Pipeline}/view'
+  
+  PipelineMetadataBucket:
+    Description: 'S3 bucket for pipeline metadata'
+    Value: !Ref PipelineMetadataBucket
