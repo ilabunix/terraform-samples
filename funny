@@ -1,0 +1,8 @@
+let Dustin = 0;
+
+while (true) {        // infinite loop
+    Dustin++;         // Dustin keeps working
+    fixUIMIssue();    // fixes a problem
+    newUIMBug();      // another bug appears
+    onCallPage();     // pager goes off again
+}
