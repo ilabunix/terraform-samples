@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Create Silver Authoring Component
+aws imagebuilder create-component \
+  --name bloomreach-silver-authoring-setup \
+  --semantic-version 1.0.0 \
+  --platform Linux \
+  --description "BloomReach Silver Authoring Setup" \
+  --data 'name: BloomReachSilverAuthoringSetup
+description: Install and configure BloomReach Authoring Silver
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: Placeholder
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "BloomReach Silver Authoring setup"
+            - echo "TODO: Add your actual setup commands here"
+' \
+  --region us-east-2
+
+# Create Silver Delivery Component
+aws imagebuilder create-component \
+  --name bloomreach-silver-delivery-setup \
+  --semantic-version 1.0.0 \
+  --platform Linux \
+  --description "BloomReach Silver Delivery Setup" \
+  --data 'name: BloomReachSilverDeliverySetup
+description: Install and configure BloomReach Delivery Silver
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: Placeholder
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "BloomReach Silver Delivery setup"
+            - echo "TODO: Add your actual setup commands here"
+' \
+  --region us-east-2
+
+# Create Bronze Authoring Component
+aws imagebuilder create-component \
+  --name bloomreach-bronze-authoring-setup \
+  --semantic-version 1.0.0 \
+  --platform Linux \
+  --description "BloomReach Bronze Authoring Setup" \
+  --data 'name: BloomReachBronzeAuthoringSetup
+description: Install and configure BloomReach Authoring Bronze
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: Placeholder
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "BloomReach Bronze Authoring setup"
+            - echo "TODO: Add your actual setup commands here"
+' \
+  --region us-east-2
+
+# Create Bronze Delivery Component
+aws imagebuilder create-component \
+  --name bloomreach-bronze-delivery-setup \
+  --semantic-version 1.0.0 \
+  --platform Linux \
+  --description "BloomReach Bronze Delivery Setup" \
+  --data 'name: BloomReachBronzeDeliverySetup
+description: Install and configure BloomReach Delivery Bronze
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: Placeholder
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "BloomReach Bronze Delivery setup"
+            - echo "TODO: Add your actual setup commands here"
+' \
+  --region us-east-2
+
+echo "✅ All components created"
