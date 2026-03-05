@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Roles for EC2 Image Builder'
+
+Resources:
+  ImageBuilderInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2ImageBuilderInstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder
+      Policies:
+        - PolicyName: BloomReachBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:PutObject
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Resource: arn:aws:kms:us-east-2:465831528245:key/781c2c45-9b01-4cb3-a47c-073e610b8782
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  ImageBuilderInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: EC2ImageBuilderInstanceProfile
+      Roles:
+        - !Ref ImageBuilderInstanceRole
+
+  ImageBuilderTriggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ImageBuilderCrossAccountTriggerRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: arn:aws:iam::128796510944:root
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: TriggerImageBuilderPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - imagebuilder:StartImagePipelineExecution
+                  - imagebuilder:GetImage
+                  - imagebuilder:GetImagePipeline
+                  - imagebuilder:ListImagePipelineImages
+                  - imagebuilder:GetImageRecipe
+                Resource: 
+                  - arn:aws:imagebuilder:us-east-2:465831528245:image-pipeline/*
+                  - arn:aws:imagebuilder:us-east-2:465831528245:image/*
+
+Outputs:
+  InstanceProfileArn:
+    Value: !GetAtt ImageBuilderInstanceProfile.Arn
+  TriggerRoleArn:
+    Value: !GetAtt ImageBuilderTriggerRole.Arn
