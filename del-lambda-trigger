@@ -1,0 +1,51 @@
+import boto3
+import json
+
+def lambda_handler(event, context):
+    """Trigger Image Builder pipelines in dev account"""
+    
+    sts = boto3.client('sts')
+    
+    try:
+        # Assume role in dev account
+        assumed_role = sts.assume_role(
+            RoleArn='arn:aws:iam::465831528245:role/ImageBuilderCrossAccountTriggerRole',
+            RoleSessionName='imagebuilder-trigger'
+        )
+        
+        # Create Image Builder client
+        imagebuilder = boto3.client(
+            'imagebuilder',
+            region_name='us-east-2',
+            aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
+            aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
+            aws_session_token=assumed_role['Credentials']['SessionToken']
+        )
+        
+        # Trigger Silver AMI pipelines
+        pipelines = [
+            'bloomreach-silver-authoring-pipeline',
+            'bloomreach-silver-delivery-pipeline'
+        ]
+        
+        results = []
+        for pipeline_name in pipelines:
+            response = imagebuilder.start_image_pipeline_execution(
+                imagePipelineArn=f'arn:aws:imagebuilder:us-east-2:465831528245:image-pipeline/{pipeline_name}'
+            )
+            results.append({
+                'pipeline': pipeline_name,
+                'status': 'STARTED',
+                'buildArn': response.get('imageBuildVersionArn')
+            })
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'results': results})
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
