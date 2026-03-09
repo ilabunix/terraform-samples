@@ -1,21 +1,48 @@
-# Add secondary source to Bronze Authoring
-aws codebuild update-project \
-  --name bloomreach-ami-bronze-authoring \
-  --secondary-sources '[
-    {
-      "type": "CODEPIPELINE",
-      "sourceIdentifier": "SilverAuthoringOutput"
-    }
-  ]' \
-  --region us-east-2
+version: 0.2
 
-# Add secondary source to Bronze Delivery
-aws codebuild update-project \
-  --name bloomreach-ami-bronze-delivery \
-  --secondary-sources '[
-    {
-      "type": "CODEPIPELINE",
-      "sourceIdentifier": "SilverDeliveryOutput"
-    }
-  ]' \
-  --region us-east-2
+phases:
+  install:
+    commands:
+      - echo "Installing Packer 1.9.4"
+      - cp tools/packer/packer /usr/local/bin/packer
+      - chmod +x /usr/local/bin/packer
+      - packer --version
+      
+      - echo "Installing AWS Session Manager plugin"
+      - cp tools/packer/session-manager-plugin /usr/local/bin/session-manager-plugin
+      - chmod +x /usr/local/bin/session-manager-plugin
+      - session-manager-plugin --version
+      
+  pre_build:
+    commands:
+      - echo "=== Bronze Authoring AMI Build ==="
+      
+      # Download Silver AMI ID from S3
+      - echo "Downloading Silver Authoring AMI ID from S3..."
+      - |
+        LATEST_FOLDER=$(aws s3 ls s3://bloomreach-ami-pipeline-artifacts-465031528245/bloomreach-ami-refre/SilverAuth/ | sort | tail -1 | awk '{print $2}')
+        aws s3 cp s3://bloomreach-ami-pipeline-artifacts-465031528245/bloomreach-ami-refre/SilverAuth/${LATEST_FOLDER}silver_authoring_ami_id ./silver_ami_id.txt
+        export SILVER_AMI_ID=$(cat silver_ami_id.txt)
+        echo "✅ Using Silver Authoring AMI: $SILVER_AMI_ID"
+      
+      - packer validate ./packer/bloomreach_bronze_authoring_ami.json
+      
+  build:
+    commands:
+      - echo "=== Building Bronze Authoring AMI ==="
+      - packer build ./packer/bloomreach_bronze_authoring_ami.json
+      
+      - awk 'match($0, /ami-[a-z0-9]+/) {print substr($0, RSTART, RLENGTH)}' packer-manifest.json | head -1 > bronze_authoring_ami_id.txt
+      - export BRONZE_AMI_ID=$(cat bronze_authoring_ami_id.txt)
+      - echo "✅ Bronze Authoring AMI: $BRONZE_AMI_ID"
+      
+      - |
+        aws ec2 modify-image-attribute \
+          --image-id $BRONZE_AMI_ID \
+          --launch-permission "Add=[{UserId=175809624659},{UserId=762649877014},{UserId=609253628652}]" \
+          --region us-east-2
+      
+artifacts:
+  files:
+    - packer-manifest.json
+    - bronze_authoring_ami_id.txt
