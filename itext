@@ -1,5 +1,9 @@
-The root cause was duplicate resource naming across East and West regions, which caused Terraform state conflicts and stale lifecycle errors in Grafana.
+I reviewed the current AWS WAF configuration associated with the CloudFront distribution. The Akamai SiteShield IP ranges shared below are not part of the AWS WAF allowed IP list.
 
-To resolve this, Mark is clearing the existing alert resources via the pipeline and then recreating them cleanly from a fresh state.
+However, AWS WAF only evaluates client traffic entering CloudFront. In our current architecture the request flow is:
 
-His view is that re-running the cleanup step serves as the backout plan. However, this approach does not restore the prior configuration — it simply re-cleans and rebuilds.
+Client → CloudFront (AWS WAF) → Akamai → On-Prem Origin
+
+Because of this, the Akamai SiteShield IPs would not be evaluated by AWS WAF. Those IP ranges are used for the Akamai → origin connection and would typically need to be permitted on the firewall or access controls protecting the origin servers.
+
+Could you confirm whether the origin connection failures you are seeing are occurring between Akamai and the on-prem origin?
