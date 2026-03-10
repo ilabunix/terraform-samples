@@ -1,9 +1,17 @@
-I reviewed the current AWS WAF configuration associated with the CloudFront distribution. The Akamai SiteShield IP ranges shared below are not part of the AWS WAF allowed IP list.
+The ADTs have not yet implemented or validated the required Lambda code changes in the lower environments that are necessary for the upcoming release.
 
-However, AWS WAF only evaluates client traffic entering CloudFront. In our current architecture the request flow is:
+Earlier today while attempting to upload the new ZIP files in the DEV environment, the pipeline failed. The failure occurred because the SSM parameter policy has not been updated to include the new ZIP filenames required by the deployment.
 
-Client → CloudFront (AWS WAF) → Akamai → On-Prem Origin
+At this time:
+	•	The Lambda code changes have not been deployed in DEV or TEST.
+	•	The new ZIP file upload process is not yet working due to missing SSM policy updates.
+	•	These changes still need to be:
+	1.	Implemented and validated in DEV
+	2.	Promoted and validated in TEST
+	3.	Deployed and tested in UAT
 
-Because of this, the Akamai SiteShield IPs would not be evaluated by AWS WAF. Those IP ranges are used for the Akamai → origin connection and would typically need to be permitted on the firewall or access controls protecting the origin servers.
+Given that the planned PROD deployment is scheduled for Sunday (3/15), there is very limited time to properly complete lower environment validation and obtain change approvals.
 
-Could you confirm whether the origin connection failures you are seeing are occurring between Akamai and the on-prem origin?
+Risk
+
+Proceeding with the current timeline introduces risk because the required changes have not yet been validated across the standard DEV → TEST → UAT promotion path.
