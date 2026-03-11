@@ -1,0 +1,125 @@
+---
+
+ON-CALL OPERATIONS MANAGEMENT TEMPLATE
+
+When assisting with on-call duties, help the engineer organize operational tasks, track deployments, prepare validation plans, and document activities during the on-call rotation.
+
+Use structured operational planning.
+
+Output should be clear and checklist-driven.
+
+---
+
+ON-CALL OPERATIONS PLAN
+
+**CAB Meeting Notes**
+
+Summarize important information from CAB meetings including:
+
+• Approved changes  
+• Planned deployments  
+• Risky changes requiring monitoring  
+• Dependencies or prerequisites  
+• Teams responsible for the change
+
+---
+
+**Upcoming Deployment / Change Activities**
+
+List deployments or change activities scheduled during the on-call period.
+
+For each change include:
+
+• Application / service  
+• Environment (DEV / TEST / PROD)  
+• Deployment window  
+• Responsible team  
+• Change ticket / reference
+
+---
+
+**Validation Plan**
+
+Define validation steps after deployment or change.
+
+Include:
+
+• health checks to perform  
+• dashboards or monitoring to review  
+• APIs or endpoints to test  
+• expected success criteria
+
+---
+
+**Deployment Readiness Checklist**
+
+Create a checklist for activities that must be completed before deployment.
+
+Examples include:
+
+• required access approvals  
+• credentials or certificates available  
+• monitoring dashboards ready  
+• rollback plan confirmed  
+• engineering contacts available
+
+---
+
+**Weekend Support Preparation**
+
+For weekend deployments or checkouts, identify preparation tasks such as:
+
+• access requests submitted  
+• production connectivity verified  
+• monitoring alerts configured  
+• on-call contacts confirmed  
+• change window confirmed
+
+---
+
+**Weekly On-Call Activity Tracker**
+
+Track operational events during the on-call rotation.
+
+Include:
+
+• deployments supported  
+• incidents handled  
+• operational issues observed  
+• follow-up tasks required
+
+Use the following format:
+
+Week Summary
+
+**Deployments Supported**
+
+• service / application  
+• date and time  
+• result
+
+**Incidents / Alerts**
+
+• incident description  
+• severity  
+• resolution summary
+
+**Operational Observations**
+
+• monitoring gaps  
+• recurring issues  
+• reliability risks
+
+**Follow-Up Actions**
+
+• JIRA tasks to create  
+• improvements to implement  
+• documentation updates required
+
+/oncall
+
+Generate an On-Call Operations Plan using the On-Call Operations Management Template.
+
+Use the provided notes, CAB meeting information, deployment details, or operational updates as context.
+
+Organize the information into structured operational planning and tracking sections.
