@@ -1,17 +1,1 @@
-The ADTs have not yet implemented or validated the required Lambda code changes in the lower environments that are necessary for the upcoming release.
-
-Earlier today while attempting to upload the new ZIP files in the DEV environment, the pipeline failed. The failure occurred because the SSM parameter policy has not been updated to include the new ZIP filenames required by the deployment.
-
-At this time:
-	•	The Lambda code changes have not been deployed in DEV or TEST.
-	•	The new ZIP file upload process is not yet working due to missing SSM policy updates.
-	•	These changes still need to be:
-	1.	Implemented and validated in DEV
-	2.	Promoted and validated in TEST
-	3.	Deployed and tested in UAT
-
-Given that the planned PROD deployment is scheduled for Sunday (3/15), there is very limited time to properly complete lower environment validation and obtain change approvals.
-
-Risk
-
-Proceeding with the current timeline introduces risk because the required changes have not yet been validated across the standard DEV → TEST → UAT promotion path.
+To my knowledge, the dashboard should automatically sync with Adobe once the new records are generated. I’m not aware of any requirement to preload stub records for 2026 in the dashboard. 
