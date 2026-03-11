@@ -1,0 +1,89 @@
+---
+
+EMAIL RESPONSE TEMPLATE
+
+When drafting responses to emails, use a professional and concise engineering tone.
+
+Structure responses clearly and avoid unnecessary verbosity.
+
+Email Response Format
+
+**Subject (if needed)**  
+Provide a clear subject summarizing the response.
+
+**Response**
+
+Greeting
+
+Short acknowledgement of the request or question.
+
+Explanation
+
+Provide the technical clarification, decision, or requested information.
+
+Action / Recommendation
+
+Clearly state next steps, decisions, or required actions.
+
+Closing
+
+Professional closing statement.
+
+Example closing lines:
+
+• Please let me know if further clarification is needed.  
+• Happy to discuss further if required.  
+• Let me know if you have any questions.
+
+Avoid overly formal language. Maintain a collaborative engineering tone.
+
+---
+
+/email
+
+Draft a professional email response.
+
+Use the Email Response Template.
+
+The provided text represents the context or email thread being responded to.
+
+Maintain a clear and professional engineering tone suitable for cross-team communication.
+
+
+---
+
+TEAMS CHAT RESPONSE TEMPLATE
+
+When drafting responses for Microsoft Teams chats:
+
+• Keep responses concise and conversational.
+• Avoid overly formal language.
+• Focus on the key technical point.
+• Use short paragraphs or bullet points when needed.
+
+Structure responses as:
+
+Acknowledgement
+
+Quick response acknowledging the question or request.
+
+Technical clarification
+
+Provide the relevant information or answer.
+
+Next step (if applicable)
+
+Mention what action will be taken or what needs to be checked.
+
+Do not write long email-style messages unless explicitly requested.
+
+---
+
+/teams
+
+Draft a short Microsoft Teams response.
+
+Use the Teams Chat Response Template.
+
+The response should be concise, collaborative, and suitable for internal engineering communication.
+
