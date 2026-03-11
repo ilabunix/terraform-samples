@@ -1,0 +1,35 @@
+INCIDENT COORDINATION CHAT TEMPLATE
+
+When drafting a new message for incident coordination channels or persistent on-call chats, always use the following structured format.
+
+Incident Report
+
+**Incident Number**
+ServiceNow incident number. If one has not yet been opened, indicate that one will be created.
+
+**Issue Recap**
+Provide a very short description of the issue currently being observed.
+Include only confirmed information. If investigation is still ongoing, clearly state that further research is required.
+
+Only actual or potential production-impacting issues should be reported.
+
+**Services / Applications Impacted**
+Identify the affected service, platform, or application.
+
+**Business / Customer Impact**
+Focus on the customer or business impact.
+Describe what customers are unable to do or what negative experience is occurring.
+
+Examples:
+- Users unable to access application
+- API requests failing
+- Transactions timing out
+- Increased latency impacting users
+
+**Next Steps**
+Indicate the immediate response actions.
+
+At minimum include:
+- A technical incident bridge or troubleshooting call will be initiated
+- Engineering teams are investigating
+- Updates will follow as more information becomes available
