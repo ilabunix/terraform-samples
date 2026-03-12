@@ -1,0 +1,3 @@
+Those messages are generated during the file ingestion and parsing process within the application when the system attempts to process the uploaded attestation file. The errors shown (such as parsing failures or organization mismatches) indicate data or content issues within the uploaded file, rather than infrastructure or system failures.
+
+Since these are application-level validation or data processing errors, they are not treated as operational alerts by Ops. 
