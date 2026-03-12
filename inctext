@@ -1,0 +1,13 @@
+Incident Number: ServiceNow incident will be created (Informational).
+
+Issue Recap:
+Approximately 3300 new 2026 attestations were created in Adobe yesterday around 5 PM; however, the SRAP dashboard is not currently displaying these records. Initial review indicates the expected synchronization between Adobe and the SRAP dashboard did not occur because the customer data file that populates the dashboard data has not yet been uploaded.
+
+Services/Applications Impacted:
+SRAP Dashboard (internal application) – Adobe attestation data synchronization.
+
+Business/Customer Impact:
+This is an internal application used by internal teams to view attestation records. The newly created attestations are currently not visible in the SRAP dashboard until the customer data file is uploaded and processed. Impact is considered minor as this does not affect external customers directly.
+
+Next Steps:
+The team is currently preparing the customer data file and working with the Release Management team to upload and run the required pipeline in the SRAP production environment to populate the dashboard and synchronize the attestation records with Adobe.
