@@ -1,0 +1,3 @@
+The team regrouped this morning to investigate the issue and identified the root cause. The failure was caused by a change in the attestation title format introduced by the new Adobe bulk upload process. The dashboard synchronization Lambda parses organization and ABA information from the attestation title. Because the new upload process applied default titles without the expected organization identifiers, the parser was unable to match records, preventing synchronization.
+
+Application Development Teams (ADTs) will review and update the parsing logic in the code and will validate the fix in lower environments before deploying the change to production.
